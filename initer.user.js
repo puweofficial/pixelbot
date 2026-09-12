@@ -18,9 +18,8 @@
 // @grant        GM_openInTab
 // @grant        unsafeWindow
 // @run-at       document-start
-// @require      https://raw.githubusercontent.com/puweofficial/pixelbot/main/pixels.user-bot.js
-// @downloadURL  https://raw.githubusercontent.com/puweofficial/pixelbot/main/initer.user.js
-// @updateURL    https://raw.githubusercontent.com/puweofficial/pixelbot/main/initer.user.js
+// @downloadURL  https://raw.githubusercontent.com/puweofficial/pixelbot/main/pixels.user-bot.js
+// @updateURL    https://raw.githubusercontent.com/puweofficial/pixelbot/main/pixels.user-bot.js
 // @homepageURL  https://black-and-red.space
 // @connect      black-and-red.space
 // @connect      githubusercontent.com
@@ -37,46 +36,49 @@
 // @connect      pixuniverse.fun
 // ==/UserScript==
 
-// ===== UPDATE CHECK =====
-
-function parseVersion(versionString) {
-    return versionString.split(".").map(Number);
-}
-
-function isVersionGreater(version2, version1) {
-    const v1 = parseVersion(version1);
-    const v2 = parseVersion(version2);
-    const maxLength = Math.max(v1.length, v2.length);
+// Load main bot code using GM_xmlhttpRequest to bypass CSP
+function loadMainBotCode() {
+    const githubUrl = 'https://raw.githubusercontent.com/puweofficial/pixelbot/main/pixels.user-bot.js';
     
-    for (let i = 0; i < maxLength; i++) {
-        const num1 = v1[i] || 0;
-        const num2 = v2[i] || 0;
-        if (num1 < num2) return true;
-        if (num1 > num2) return false;
-    }
-    return false;
+    console.log('[PixelBot] Loading bot code from GitHub:', githubUrl);
+    
+    GM_xmlhttpRequest({
+        method: 'GET',
+        url: githubUrl,
+        onload: function(response) {
+            if (response.status === 200) {
+                console.log('[PixelBot] Bot code loaded from GitHub successfully');
+                // Create a Blob and load it as a script to bypass CSP
+                try {
+                    const blob = new Blob([response.responseText], { type: 'text/javascript' });
+                    const blobUrl = URL.createObjectURL(blob);
+                    const script = document.createElement('script');
+                    script.src = blobUrl;
+                    script.onload = () => {
+                        console.log('[PixelBot] Bot code executed successfully');
+                        URL.revokeObjectURL(blobUrl);
+                    };
+                    script.onerror = (error) => {
+                        console.error('[PixelBot] Failed to execute bot code via blob:', error);
+                        URL.revokeObjectURL(blobUrl);
+                    };
+                    document.head.appendChild(script);
+                } catch (error) {
+                    console.error('[PixelBot] Failed to create blob:', error);
+                }
+            } else {
+                console.error('[PixelBot] Failed to load bot code from GitHub, status:', response.status);
+            }
+        },
+        onerror: function(error) {
+            console.error('[PixelBot] Failed to load bot code from GitHub:', error);
+        }
+    });
 }
 
-// Check for updates
-if (typeof GM_info !== 'undefined' && GM_info.script.updateURL) {
-    console.log('[PixelBot] Checking for updates...');
-    fetch(GM_info.script.updateURL, { headers: { Range: 'bytes=0-512' } })
-        .then(res => res.text())
-        .then(code => {
-            const lines = code.replaceAll('\r', '').split('\n');
-            const versionLine = lines.find(line => line.includes('@version'));
-            const version = versionLine?.match(/(\d|\.)+/g)?.pop();
-            
-            if (version && isVersionGreater(version, GM_info.script.version)) {
-                console.log('[PixelBot] New version available:', version);
-                console.log('[PixelBot] Opening update tab...');
-                const tab = GM_openInTab(GM_info.script.updateURL, { active: true });
-                tab.onclose = () => location.reload();
-            } else {
-                console.log('[PixelBot] Bot is up to date');
-            }
-        })
-        .catch(error => {
-            console.error('[PixelBot] Update check failed:', error);
-        });
+// Load bot code when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', loadMainBotCode);
+} else {
+    loadMainBotCode();
 }
