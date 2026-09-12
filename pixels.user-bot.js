@@ -18,8 +18,8 @@
 // @grant        GM_openInTab
 // @grant        unsafeWindow
 // @run-at       document-start
-// @downloadURL  https://touchedbydarkness.github.io/stuff/ppf_bot_2/bot-new.user.js
-// @updateURL    https://touchedbydarkness.github.io/stuff/ppf_bot_2/bot-new.user.js
+// @downloadURL  https://raw.githubusercontent.com/puweofficial/pixelbot/main/pixels.user-bot.js
+// @updateURL    https://raw.githubusercontent.com/puweofficial/pixelbot/main/pixels.user-bot.js
 // @homepageURL  https://black-and-red.space
 // @connect      black-and-red.space
 // @connect      githubusercontent.com
@@ -34,6 +34,8 @@
 // @connect      gplace.fun
 // @connect      pixuniverse.fun
 // ==/UserScript==
+
+// ===== MAIN BOT CODE =====
 
 // ===== UTILITY FUNCTIONS =====
 
@@ -1814,4 +1816,8 @@ function setupCropSelection(uiContainer, templateManager, cropButton) {
 // ===== START BOT =====
 
 // Initialize bot when script loads
-initializeBot();
+// Only initialize if not already loaded by initer
+if (typeof window.PixelBotInitialized === 'undefined') {
+    window.PixelBotInitialized = true;
+    initializeBot();
+}
