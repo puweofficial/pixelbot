@@ -104,12 +104,16 @@ const botState = {
     queue: [],
     pixelsPlaced: 0,
     isRunning: false,
-    humanPlacing: true,
+    placementMethod: 'human', // human, follow, lines
     accumulatedCooldown: 0,
     maxCooldown: 10,
     template: null,
     templateX: 0,
     templateY: 0,
+    cropX: 0,
+    cropY: 0,
+    cropWidth: 0,
+    cropHeight: 0,
     apiCooldown: 0
 };
 
@@ -238,6 +242,70 @@ async function humanPlacingLoop() {
     }
 }
 
+// ===== FOLLOW PLACING METHOD =====
+async function followPlacingLoop() {
+    if (!botState.isRunning || botState.queue.length === 0) {
+        return;
+    }
+    
+    while (botState.queue.length > 0 && botState.isRunning) {
+        const pixel = botState.queue.shift();
+        const success = await placePixel(pixel.x, pixel.y, pixel.color);
+        
+        if (success) {
+            botState.pixelsPlaced++;
+        } else {
+            // Requeue failed pixel
+            botState.queue.push(pixel);
+            // Wait before retry
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        
+        // Short delay between placements
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    // Continue loop
+    if (botState.isRunning && botState.queue.length > 0) {
+        setTimeout(followPlacingLoop, 100);
+    }
+}
+
+// ===== STANDARD LINES METHOD =====
+async function standardLinesLoop() {
+    if (!botState.isRunning || botState.queue.length === 0) {
+        return;
+    }
+    
+    // Sort queue by Y coordinate, then by X (top to bottom, left to right)
+    botState.queue.sort((a, b) => {
+        if (a.y !== b.y) return a.y - b.y;
+        return a.x - b.x;
+    });
+    
+    while (botState.queue.length > 0 && botState.isRunning) {
+        const pixel = botState.queue.shift();
+        const success = await placePixel(pixel.x, pixel.y, pixel.color);
+        
+        if (success) {
+            botState.pixelsPlaced++;
+        } else {
+            // Requeue failed pixel
+            botState.queue.push(pixel);
+            // Wait before retry
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        
+        // Short delay between placements
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    // Continue loop
+    if (botState.isRunning && botState.queue.length > 0) {
+        setTimeout(standardLinesLoop, 100);
+    }
+}
+
 // ===== TEMPLATE LOADING =====
 async function loadTemplate() {
     const input = document.createElement('input');
@@ -281,6 +349,9 @@ async function loadTemplate() {
                     }
                 }
                 
+                // Auto-detect crop bounds
+                detectCropBounds();
+                
                 updateStatus('Template loaded: ' + botState.template.pixels.length + ' pixels');
             };
             img.src = event.target.result;
@@ -289,6 +360,79 @@ async function loadTemplate() {
     };
     
     input.click();
+}
+
+function detectCropBounds() {
+    if (!botState.template || botState.template.pixels.length === 0) return;
+    
+    const pixels = botState.template.pixels;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    
+    pixels.forEach(pixel => {
+        if (pixel.x < minX) minX = pixel.x;
+        if (pixel.x > maxX) maxX = pixel.x;
+        if (pixel.y < minY) minY = pixel.y;
+        if (pixel.y > maxY) maxY = pixel.y;
+    });
+    
+    botState.cropX = minX;
+    botState.cropY = minY;
+    botState.cropWidth = maxX - minX + 1;
+    botState.cropHeight = maxY - minY + 1;
+    
+    // Update crop field inputs
+    const cropXInput = document.querySelector('#crop-x');
+    const cropYInput = document.querySelector('#crop-y');
+    const cropWidthInput = document.querySelector('#crop-width');
+    const cropHeightInput = document.querySelector('#crop-height');
+    
+    if (cropXInput) cropXInput.value = botState.cropX;
+    if (cropYInput) cropYInput.value = botState.cropY;
+    if (cropWidthInput) cropWidthInput.value = botState.cropWidth;
+    if (cropHeightInput) cropHeightInput.value = botState.cropHeight;
+    
+    // Update coordinate inputs
+    const xInput = document.querySelector('#template-x');
+    const yInput = document.querySelector('#template-y');
+    if (xInput) xInput.value = botState.cropX;
+    if (yInput) yInput.value = botState.cropY;
+    
+    updateStatus('Auto-detected crop: X=' + botState.cropX + ', Y=' + botState.cropY + ', W=' + botState.cropWidth + ', H=' + botState.cropHeight);
+}
+
+function cropTemplate() {
+    if (!botState.template || botState.template.pixels.length === 0) {
+        updateStatus('No template loaded');
+        return;
+    }
+    
+    const cropX = parseInt(document.querySelector('#crop-x').value) || 0;
+    const cropY = parseInt(document.querySelector('#crop-y').value) || 0;
+    const cropWidth = parseInt(document.querySelector('#crop-width').value) || botState.template.width;
+    const cropHeight = parseInt(document.querySelector('#crop-height').value) || botState.template.height;
+    
+    // Filter pixels within crop bounds
+    botState.template.pixels = botState.template.pixels.filter(pixel => 
+        pixel.x >= cropX && pixel.x < cropX + cropWidth &&
+        pixel.y >= cropY && pixel.y < cropY + cropHeight
+    );
+    
+    // Update template dimensions
+    botState.template.width = cropWidth;
+    botState.template.height = cropHeight;
+    
+    // Adjust pixel coordinates relative to crop
+    botState.template.pixels = botState.template.pixels.map(pixel => ({
+        x: pixel.x - cropX,
+        y: pixel.y - cropY,
+        color: pixel.color
+    }));
+    
+    // Update coordinates
+    botState.templateX = cropX;
+    botState.templateY = cropY;
+    
+    updateStatus('Template cropped: ' + botState.template.pixels.length + ' pixels');
 }
 
 function rgbToColorId(r, g, b) {
@@ -318,6 +462,21 @@ function createUI() {
             <label>Load Template Image</label>
             <button id="load-template">Load Template</button>
             
+            <label>Crop X</label>
+            <input type="number" id="crop-x" value="0">
+            
+            <label>Crop Y</label>
+            <input type="number" id="crop-y" value="0">
+            
+            <label>Crop Width</label>
+            <input type="number" id="crop-width" value="0">
+            
+            <label>Crop Height</label>
+            <input type="number" id="crop-height" value="0">
+            
+            <button id="crop-template">Crop Template</button>
+            <button id="auto-crop">Auto Detect Crop</button>
+            
             <label>Template X Coordinate</label>
             <input type="number" id="template-x" value="0">
             
@@ -331,6 +490,8 @@ function createUI() {
             <label>Placement Method</label>
             <select id="placement-method">
                 <option value="human">Human Placing</option>
+                <option value="follow">Follow Placing</option>
+                <option value="lines">Standard Lines</option>
             </select>
             
             <label>Accumulation Time (seconds)</label>
@@ -350,6 +511,8 @@ function createUI() {
     
     // Add event listeners
     ui.querySelector('#load-template').addEventListener('click', loadTemplate);
+    ui.querySelector('#crop-template').addEventListener('click', cropTemplate);
+    ui.querySelector('#auto-crop').addEventListener('click', detectCropBounds);
     ui.querySelector('#add-to-queue').addEventListener('click', addToQueue);
     ui.querySelector('#start-bot').addEventListener('click', startBot);
     ui.querySelector('#stop-bot').addEventListener('click', stopBot);
@@ -402,14 +565,28 @@ function startBot() {
     }
     
     botState.isRunning = true;
-    botState.humanPlacing = true;
+    botState.placementMethod = document.querySelector('#placement-method').value;
     botState.accumulatedCooldown = 0;
     
     const accumulationTime = parseInt(document.querySelector('#accumulation-time').value) || 10;
     botState.maxCooldown = accumulationTime;
     
-    updateStatus('Bot started');
-    humanPlacingLoop();
+    updateStatus('Bot started with ' + botState.placementMethod + ' method');
+    
+    // Start appropriate placement loop
+    switch (botState.placementMethod) {
+        case 'human':
+            humanPlacingLoop();
+            break;
+        case 'follow':
+            followPlacingLoop();
+            break;
+        case 'lines':
+            standardLinesLoop();
+            break;
+        default:
+            humanPlacingLoop();
+    }
 }
 
 function stopBot() {
