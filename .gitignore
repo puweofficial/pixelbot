@@ -4,8 +4,14 @@ PAT.txt
 *token*
 *PAT*
 
-# Temporary and backup files
-*.bak
-*.tmp
+# Local legacy reference files (not uploaded to repo)
+darkbot-extension/
+old bot.js
+oldbot user.js
+initer-test-2.user.js
+
+# Temporary and scratch files
 P/
 scratch/
+*.bak
+*.tmp
