@@ -66,7 +66,7 @@ customStyle.textContent = `
         margin-right: 10px;
         cursor: pointer;
     }
-    .pixelbot-ui input {
+    .pixelbot-ui input:not([type="checkbox"]) {
         width: 100%;
         padding: 8px;
         background: rgba(10, 0, 30, 0.8);
