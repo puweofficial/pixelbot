@@ -1,0 +1,11 @@
+﻿# Secrets and tokens
+PAT.txt
+Новий текстовий документ.txt
+*token*
+*PAT*
+
+# Temporary and backup files
+*.bak
+*.tmp
+P/
+scratch/
