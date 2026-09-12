@@ -18,8 +18,9 @@
 // @grant        GM_openInTab
 // @grant        unsafeWindow
 // @run-at       document-start
-// @downloadURL  https://raw.githubusercontent.com/puweofficial/pixelbot/main/pixels.user-bot.js
-// @updateURL    https://raw.githubusercontent.com/puweofficial/pixelbot/main/pixels.user-bot.js
+// @require      https://raw.githubusercontent.com/puweofficial/pixelbot/main/pixels.user-bot.js
+// @downloadURL  https://raw.githubusercontent.com/puweofficial/pixelbot/main/initer.user.js
+// @updateURL    https://raw.githubusercontent.com/puweofficial/pixelbot/main/initer.user.js
 // @homepageURL  https://black-and-red.space
 // @connect      black-and-red.space
 // @connect      githubusercontent.com
@@ -78,85 +79,4 @@ if (typeof GM_info !== 'undefined' && GM_info.script.updateURL) {
         .catch(error => {
             console.error('[PixelBot] Update check failed:', error);
         });
-}
-
-// ===== LOAD MAIN BOT CODE =====
-
-// Load the main bot code from GitHub using GM_xmlhttpRequest
-function loadMainBotCode() {
-    const githubUrl = 'https://raw.githubusercontent.com/puweofficial/pixelbot/main/pixels.user-bot.js';
-    
-    console.log('[PixelBot] Loading bot code from GitHub:', githubUrl);
-    
-    GM_xmlhttpRequest({
-        method: 'GET',
-        url: githubUrl,
-        onload: function(response) {
-            if (response.status === 200) {
-                console.log('[PixelBot] Bot code loaded from GitHub successfully');
-                // Create a Blob and load it as a script to bypass CSP
-                try {
-                    const blob = new Blob([response.responseText], { type: 'text/javascript' });
-                    const blobUrl = URL.createObjectURL(blob);
-                    const script = document.createElement('script');
-                    script.src = blobUrl;
-                    script.onload = () => {
-                        console.log('[PixelBot] Bot code executed successfully');
-                        URL.revokeObjectURL(blobUrl);
-                    };
-                    script.onerror = (error) => {
-                        console.error('[PixelBot] Failed to execute bot code via blob:', error);
-                        URL.revokeObjectURL(blobUrl);
-                        loadLocalBotCode();
-                    };
-                    document.head.appendChild(script);
-                } catch (error) {
-                    console.error('[PixelBot] Failed to create blob:', error);
-                    loadLocalBotCode();
-                }
-            } else {
-                console.error('[PixelBot] Failed to load bot code from GitHub, status:', response.status);
-                loadLocalBotCode();
-            }
-        },
-        onerror: function(error) {
-            console.error('[PixelBot] Failed to load bot code from GitHub:', error);
-            loadLocalBotCode();
-        }
-    });
-}
-
-// Load local bot code as fallback
-function loadLocalBotCode() {
-    console.log('[PixelBot] Trying fallback to local file...');
-    
-    // Try to load from local file using FileReader
-    const localScript = document.createElement('script');
-    localScript.src = 'pixels.user-bot.js';
-    localScript.onload = () => {
-        console.log('[PixelBot] Main bot code loaded from local file');
-    };
-    localScript.onerror = (error) => {
-        console.error('[PixelBot] Failed to load main bot code from local file:', error);
-    };
-    
-    if (document.head) {
-        document.head.appendChild(localScript);
-    } else {
-        document.addEventListener('DOMContentLoaded', () => {
-            if (document.head) {
-                document.head.appendChild(localScript);
-            } else {
-                console.error('[PixelBot] No document.head available');
-            }
-        });
-    }
-}
-
-// Load bot code with proper timing
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', loadMainBotCode);
-} else {
-    // Small delay to ensure DOM is ready
-    setTimeout(loadMainBotCode, 100);
 }
