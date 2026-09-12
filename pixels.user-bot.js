@@ -54,6 +54,18 @@ customStyle.textContent = `
         color: white;
         font-size: 12px;
     }
+    .pixelbot-ui .checkbox-label {
+        display: flex;
+        align-items: center;
+        margin: 10px 0 5px 0;
+        color: white;
+        font-size: 12px;
+    }
+    .pixelbot-ui .checkbox-label input {
+        width: auto;
+        margin-right: 10px;
+        cursor: pointer;
+    }
     .pixelbot-ui input {
         width: 100%;
         padding: 8px;
@@ -104,7 +116,10 @@ const botState = {
     queue: [],
     pixelsPlaced: 0,
     isRunning: false,
-    placementMethod: 'human', // human, follow, lines
+    placementMethod: 'human', // human, lines
+    followPlacing: false,
+    followX: 0,
+    followY: 0,
     accumulatedCooldown: 0,
     maxCooldown: 10,
     template: null,
@@ -242,32 +257,77 @@ async function humanPlacingLoop() {
     }
 }
 
-// ===== FOLLOW PLACING METHOD =====
-async function followPlacingLoop() {
+// ===== FOLLOW PLACING INDICATOR =====
+function showFollowIndicator() {
+    if (!botState.followPlacing || botState.queue.length === 0) {
+        return;
+    }
+    
+    // Remove existing indicator
+    const existingIndicator = document.querySelector('.pixelbot-indicator');
+    if (existingIndicator) {
+        existingIndicator.remove();
+    }
+    
+    // Show next pixel position
+    const nextPixel = botState.queue[0];
+    if (!nextPixel) return;
+    
+    const indicator = document.createElement('div');
+    indicator.className = 'pixelbot-indicator';
+    indicator.style.cssText = `
+        position: fixed;
+        width: 20px;
+        height: 20px;
+        background: rgba(255, 0, 0, 0.5);
+        border: 2px solid red;
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 2147483646;
+        left: ${nextPixel.x}px;
+        top: ${nextPixel.y}px;
+        transform: translate(-50%, -50%);
+    `;
+    
+    document.body.appendChild(indicator);
+}
+
+function hideFollowIndicator() {
+    const existingIndicator = document.querySelector('.pixelbot-indicator');
+    if (existingIndicator) {
+        existingIndicator.remove();
+    }
+}
+
+// ===== FOLLOW PLACING LOGIC =====
+async function placeWithFollow() {
     if (!botState.isRunning || botState.queue.length === 0) {
         return;
     }
     
-    while (botState.queue.length > 0 && botState.isRunning) {
-        const pixel = botState.queue.shift();
-        const success = await placePixel(pixel.x, pixel.y, pixel.color);
-        
-        if (success) {
-            botState.pixelsPlaced++;
-        } else {
-            // Requeue failed pixel
-            botState.queue.push(pixel);
-            // Wait before retry
-            await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-        
-        // Short delay between placements
-        await new Promise(resolve => setTimeout(resolve, 100));
+    if (botState.followPlacing) {
+        showFollowIndicator();
+    }
+    
+    const pixel = botState.queue.shift();
+    const success = await placePixel(pixel.x, pixel.y, pixel.color);
+    
+    if (success) {
+        botState.pixelsPlaced++;
+    } else {
+        // Requeue failed pixel
+        botState.queue.push(pixel);
+        // Wait before retry
+        await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    
+    if (botState.followPlacing) {
+        hideFollowIndicator();
     }
     
     // Continue loop
     if (botState.isRunning && botState.queue.length > 0) {
-        setTimeout(followPlacingLoop, 100);
+        setTimeout(placeWithFollow, 100);
     }
 }
 
@@ -490,9 +550,12 @@ function createUI() {
             <label>Placement Method</label>
             <select id="placement-method">
                 <option value="human">Human Placing</option>
-                <option value="follow">Follow Placing</option>
                 <option value="lines">Standard Lines</option>
             </select>
+            
+            <label class="checkbox-label">
+                <input type="checkbox" id="follow-placing"> Follow Placing (show where to place)
+            </label>
             
             <label>Accumulation Time (seconds)</label>
             <input type="number" id="accumulation-time" value="10">
@@ -566,31 +629,35 @@ function startBot() {
     
     botState.isRunning = true;
     botState.placementMethod = document.querySelector('#placement-method').value;
+    botState.followPlacing = document.querySelector('#follow-placing').checked;
     botState.accumulatedCooldown = 0;
     
     const accumulationTime = parseInt(document.querySelector('#accumulation-time').value) || 10;
     botState.maxCooldown = accumulationTime;
     
-    updateStatus('Bot started with ' + botState.placementMethod + ' method');
+    updateStatus('Bot started with ' + botState.placementMethod + ' method' + (botState.followPlacing ? ' + Follow Placing' : ''));
     
     // Start appropriate placement loop
-    switch (botState.placementMethod) {
-        case 'human':
-            humanPlacingLoop();
-            break;
-        case 'follow':
-            followPlacingLoop();
-            break;
-        case 'lines':
-            standardLinesLoop();
-            break;
-        default:
-            humanPlacingLoop();
+    if (botState.followPlacing) {
+        placeWithFollow();
+    } else {
+        switch (botState.placementMethod) {
+            case 'human':
+                humanPlacingLoop();
+                break;
+            case 'lines':
+                standardLinesLoop();
+                break;
+            default:
+                humanPlacingLoop();
+        }
     }
 }
 
 function stopBot() {
     botState.isRunning = false;
+    botState.followPlacing = false;
+    hideFollowIndicator();
     updateStatus('Bot stopped');
 }
 
