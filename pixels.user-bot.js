@@ -35,6 +35,42 @@
 // @connect      pixuniverse.fun
 // ==/UserScript==
 
+// Inject custom CSS for blue-purple gradient theme
+const customStyle = document.createElement('style');
+customStyle.textContent = `
+    /* Blue-purple gradient theme override */
+    .darkbot-ui, [class*="darkbot"], [id*="darkbot"] {
+        background: linear-gradient(135deg, #4a90e2 0%, #9b59b6 100%) !important;
+        border-color: #6c5ce7 !important;
+    }
+    .darkbot-ui button, [class*="darkbot"] button, [id*="darkbot"] button {
+        background: linear-gradient(135deg, #4a90e2 0%, #9b59b6 100%) !important;
+        border-color: #6c5ce7 !important;
+        color: white !important;
+    }
+    .darkbot-ui button:hover, [class*="darkbot"] button:hover, [id*="darkbot"] button:hover {
+        background: linear-gradient(135deg, #6c5ce7 0%, #9b59b6 100%) !important;
+    }
+    .darkbot-ui input, [class*="darkbot"] input, [id*="darkbot"] input {
+        background: rgba(10, 0, 30, 0.8) !important;
+        border-color: #6c5ce7 !important;
+        color: white !important;
+    }
+    .darkbot-ui .active, [class*="darkbot"] .active, [id*="darkbot"] .active {
+        background: linear-gradient(135deg, #4a90e2 0%, #9b59b6 100%) !important;
+    }
+`;
+if (document.head) {
+    document.head.appendChild(customStyle);
+} else {
+    document.addEventListener('DOMContentLoaded', () => {
+        if (document.head) {
+            document.head.appendChild(customStyle);
+        }
+    });
+}
+
+
 function parseVersion(versionString){return versionString.split(".").map(Number)}
 
 function isVersionGreater(version2,version1){const v1=parseVersion(version1);const v2=parseVersion(version2);const maxLength=Math.max(v1.length,v2.length);for(let i=0;i<maxLength;i++){const num1=v1[i]||0;const num2=v2[i]||0;if(num1<num2)return true;if(num1>num2)return false}return false}
